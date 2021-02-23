@@ -1,4 +1,4 @@
-import { el, mount, setChildren } from "https://redom.js.org/redom.es.min.js";
+import { el, mount, setChildren } from "./redom.es.min.js";
 
 class App {
     constructor() {
@@ -28,6 +28,7 @@ class App {
             el("label", "Average annual interest rate", 
                 this.averageInterestRate = el("input", { type: "number" }),
             ),
+            this.chart = el("canvas"),
             this.value50YearList = el("table"),
             {
                 style: `
@@ -45,7 +46,28 @@ class App {
             })
         };
 
-        this.update(this.data);
+        this.chart.update = (values) => {
+            const ctx = this.chart.getContext('2d');
+            new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: [...Array(values.length).keys()].map(x => x+1),
+                    datasets: [{
+                        label: "networth",
+                        data: values.map(Math.round),
+                    }],
+                },
+                options: {
+                    scales: {
+                        yAxes: [{
+                            ticks: {
+                                beginAtZero: true,
+                            }
+                        }]
+                    },
+                }
+            });
+        };
 
         // Update on field changes
         ["initialInvestment", "contributionFrequency", "contributionAmount", "averageInterestRate"].forEach(key => {
@@ -53,6 +75,8 @@ class App {
                 this.update({ ...this.data, [key]: e.target.value })
             });
         });
+
+        this.update(this.data);
     }
     
     update(data) {
@@ -65,7 +89,10 @@ class App {
         this.contributionFrequency.value = data.contributionFrequency;
         this.contributionAmount.value = data.contributionAmount;
         this.averageInterestRate.value = data.averageInterestRate;
-        this.value50YearList.update(this.calculate50YearValues(data));
+
+        const values = this.calculate50YearValues(data);
+        this.value50YearList.update(values.map(numberToMoney));
+        this.chart.update(values)
 
         this.data = data;
     }
@@ -80,12 +107,15 @@ class App {
                 networth += data.contributionAmount;
             }
             if (i % 365 == 0) {
-                const money = networth.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-                values.push(money)
+                values.push(networth)
             }
         }
         return values;
     }
+}
+
+function numberToMoney(num) {
+    return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 }
 
 mount(document.body, new App());
